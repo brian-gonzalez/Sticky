@@ -1,0 +1,24 @@
+//These are just example styles that should help you understand
+//what properties to when the 'sticky' element has certain classes.
+
+.fixit-element {
+	&.fixit--active {
+		position: fixed;
+		transform: translate3d(0,0,0); //Fixes iOS flicker/lag.
+
+		//Only add this when NOT using the 'containedInParent' setting.
+		// width: 100%;
+		top: 0;
+	}
+
+	&.fixit--bottom,
+	&.fixit--docked {
+		top: initial;
+		bottom: 0;
+	}
+
+	&.fixit--frozen,
+	&.fixit--docked {
+		position: absolute;
+	}
+}
