@@ -76,7 +76,7 @@ export default class FixIt {
      * @return {[type]} [description]
      */
     getOffsetValue() {
-        return this.offsetElement instanceof HTMLElement ? this.offsetElement.getBoundingClientRect().height : (this.offset || 0);
+        return this.offsetElement instanceof HTMLElement ? Math.floor(this.offsetElement.getBoundingClientRect().height) : (this.offset || 0);
     }
 
     //Initial FixIt setup. Should only run once to avoid attaching repeated event handlers.
@@ -134,21 +134,19 @@ export default class FixIt {
                                 this.isFrozen = false;
                                 this.setActive(true);
                             }
-                        }
-                        //We don't wanna run this if it's docked
-                        else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                        } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                            //We don't wanna run this if it's docked
                             this.isActive = false;
                             this.setFrozen();
                         }
                     } else {
-                        if (targetRect.top >= this.offset) {
+                        if (Math.floor(targetRect.top) >= this.offset) {
                             if(!this.isActive) {
                                 this.isFrozen = false;
                                 this.setActive();
                             }
-                        }
-                        //We don't wanna run this if it's docked
-                        else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                        } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                            //We don't wanna run this if it's docked
                             this.isActive = false;
                             this.setFrozen();
                         }

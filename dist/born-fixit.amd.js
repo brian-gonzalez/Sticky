@@ -105,7 +105,7 @@ define(['exports'], function (exports) {
         }, {
             key: 'getOffsetValue',
             value: function getOffsetValue() {
-                return this.offsetElement instanceof HTMLElement ? this.offsetElement.getBoundingClientRect().height : this.offset || 0;
+                return this.offsetElement instanceof HTMLElement ? Math.floor(this.offsetElement.getBoundingClientRect().height) : this.offset || 0;
             }
         }, {
             key: 'initialSetup',
@@ -161,24 +161,22 @@ define(['exports'], function (exports) {
                                         this.isFrozen = false;
                                         this.setActive(true);
                                     }
+                                } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                                    //We don't wanna run this if it's docked
+                                    this.isActive = false;
+                                    this.setFrozen();
                                 }
-                                //We don't wanna run this if it's docked
-                                else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
-                                        this.isActive = false;
-                                        this.setFrozen();
-                                    }
                             } else {
-                                if (targetRect.top >= this.offset) {
+                                if (Math.floor(targetRect.top) >= this.offset) {
                                     if (!this.isActive) {
                                         this.isFrozen = false;
                                         this.setActive();
                                     }
+                                } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                                    //We don't wanna run this if it's docked
+                                    this.isActive = false;
+                                    this.setFrozen();
                                 }
-                                //We don't wanna run this if it's docked
-                                else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
-                                        this.isActive = false;
-                                        this.setFrozen();
-                                    }
                             }
                         }
 
