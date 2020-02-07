@@ -36,7 +36,7 @@ export default class FixIt {
 
             if (!this.isEnabled && this.shouldEnable()) {
                 this.isEnabled = true;
-                
+
                 if (!this.placeholder) {
                     this.initialSetup();
                 }
@@ -76,7 +76,7 @@ export default class FixIt {
      * @return {[type]} [description]
      */
     getOffsetValue() {
-        return this.offsetElement instanceof HTMLElement ? Math.floor(this.offsetElement.getBoundingClientRect().height) : (this.offset || 0);
+        return this.offsetElement instanceof HTMLElement ? Math.round(this.offsetElement.getBoundingClientRect().height) : (this.offset || 0);
     }
 
     //Initial FixIt setup. Should only run once to avoid attaching repeated event handlers.
@@ -129,7 +129,7 @@ export default class FixIt {
                         targetRect = this.target.getBoundingClientRect();
 
                     if ( scrollDir === 'down' ) {
-                        if (Math.floor(targetRect.bottom) <= document.documentElement.clientHeight) {
+                        if (Math.round(targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
                             if(!this.isActive) {
                                 this.isFrozen = false;
                                 this.setActive(true);
@@ -140,7 +140,7 @@ export default class FixIt {
                             this.setFrozen();
                         }
                     } else {
-                        if (Math.floor(targetRect.top) >= this.offset) {
+                        if (Math.round(targetRect.top) >= this.offset) {
                             if(!this.isActive) {
                                 this.isFrozen = false;
                                 this.setActive();
