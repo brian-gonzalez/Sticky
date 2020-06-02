@@ -100,9 +100,12 @@ export default class FixIt {
             this.options.respondToParent = this.options.respondToParent instanceof HTMLElement ? this.options.respondToParent : this.parentContainer;
 
             window.addEventListener('resize', this.respondTo.bind(this));
+            this.target.addEventListener('fixit:triggerResize', this.respondTo.bind(this));
         }
 
         this.scrollPosition = 0;
+
+        this.publishEvent('fixit', 'init', this.target);
 
         if (typeof this.options.onInitCallback === 'function') {
             this.options.onInitCallback(this.target, this);
@@ -271,6 +274,8 @@ export default class FixIt {
             this.respondTo();
         }
 
+        this.publishEvent('fixit', 'active', this.target);
+
         if (typeof this.options.onActiveCallback === 'function') {
             this.options.onActiveCallback(this.target, this);
         }
@@ -291,6 +296,8 @@ export default class FixIt {
         if (this.options.respondToParent) {
             this.target.style.width = '';
         }
+
+        this.publishEvent('fixit', 'inactive', this.target);
 
         if (typeof this.options.onInactiveCallback === 'function') {
             this.options.onInactiveCallback(this.target, this);
@@ -357,5 +364,31 @@ export default class FixIt {
         this.scrollPosition = docScrollTop;
 
         return direction;
+    }
+
+    /**
+     * Publish an event at the specific target element scope
+     * for other modules to subscribe.
+     * The subscribe method can be a standard
+     * .addEventListener('moduleName.eventName') method
+     *
+     * @param {String} moduleName
+     * @param {String} eventName
+     * @param {HTMLElement} target
+     */
+    publishEvent(moduleName, eventName, target) {
+        let event,
+            params = { bubbles: true, cancelable: true },
+            eventString = moduleName && eventName ? `${moduleName}:${eventName}` : (moduleName || eventName);
+
+        // IE >= 9, CustomEvent() constructor does not exist
+        if (typeof window.CustomEvent !== 'function') {
+            event = document.createEvent('CustomEvent');
+            event.initCustomEvent(eventString, params.bubbles, params.cancelable, null);
+        } else {
+            event = new CustomEvent(eventString, params);
+        }
+
+        target.dispatchEvent(event);
     }
 }
