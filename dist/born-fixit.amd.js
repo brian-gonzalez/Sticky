@@ -40,10 +40,10 @@ define(['exports'], function (exports) {
             };
             // this.offset = isNaN(this.options.offset) ?  || 0;
             this.target = (typeof this.options.target === 'string' ? document.querySelector(this.options.target) : this.options.target) || false;
-            this.offsetElement = false;
+            this.offsetElements = false;
 
             if (this.options.offset && isNaN(this.options.offset)) {
-                this.offsetElement = typeof this.options.offset === 'string' ? document.querySelector(this.options.offset) : this.options.offset;
+                this.offsetElements = typeof this.options.offset === 'string' ? document.querySelectorAll(this.options.offset) : this.options.offset;
                 this.offset = this.getOffsetValue();
             } else {
                 this.offset = this.options.offset || 0;
@@ -105,7 +105,17 @@ define(['exports'], function (exports) {
         }, {
             key: 'getOffsetValue',
             value: function getOffsetValue() {
-                return this.offsetElement instanceof HTMLElement ? Math.round(this.offsetElement.getBoundingClientRect().height) : this.offset || 0;
+                var resultSum = 0;
+
+                if (this.offsetElements instanceof NodeList) {
+                    [].forEach.call(this.offsetElements, function (currentEl) {
+                        resultSum += Math.round(currentEl.getBoundingClientRect().height);
+                    });
+                } else {
+                    resultSum = this.offset || 0;
+                }
+
+                return resultSum;
             }
         }, {
             key: 'initialSetup',
