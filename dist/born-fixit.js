@@ -9,7 +9,9 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var FixIt = function () {
-    function FixIt(options) {
+    function FixIt() {
+        var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
         _classCallCheck(this, FixIt);
 
         this.options = options;
@@ -28,11 +30,19 @@ var FixIt = function () {
             this.offset = this.options.offset || 0;
         }
 
+        //Milliseconds to wait after the last scroll happened.
+        //A value between 75 and 300 is recommended to prevent miscalculations.
+        this._scrollDirectionWait = this.options.scrollDirectionWait || 100;
+
+        //Minimum distance to scroll within the "wait" period.
+        this._scrollPositionThereshold = this.options.scrollPositionThereshold || 75;
+
+        //Amount of times the scroll should fire before allowing to change the direction.
+        //Setting this and `scrollPositionThereshold` to 0 makes the direction change happen on every scroll.
+        this._scrollDirectionThrottle = this.options.scrollDirectionThrottle || 20;
+
         this._boundUpdateStickyStatus = this.updateStickyStatus.bind(this);
         this._boundEnableSticky = this.enableSticky.bind(this, 150);
-        this._updateInterval;
-        // this._previousTopPos;
-        this._previousDocumentHeight;
 
         if (this.target) {
             this.enableSticky();
@@ -62,8 +72,9 @@ var FixIt = function () {
                     this._boundUpdateStickyStatus();
                 } else if (this.isEnabled && !this.shouldEnable()) {
                     this.isEnabled = false;
-                    this.isActive = false;
+
                     this.setInactive();
+
                     window.clearInterval(this._updateInterval);
                     window.removeEventListener('scroll', this._boundUpdateStickyStatus);
                 }
@@ -78,9 +89,10 @@ var FixIt = function () {
         key: 'destroySticky',
         value: function destroySticky() {
             this.isEnabled = false;
-            this.isActive = false;
+
             this.setInactive();
             this.removePlaceholder();
+
             window.clearTimeout(this._resizeTimeout);
             window.clearInterval(this._updateInterval);
             window.removeEventListener('resize', this._boundEnableSticky);
@@ -132,6 +144,10 @@ var FixIt = function () {
             if (typeof this.options.onInitCallback === 'function') {
                 this.options.onInitCallback(this.target, this);
             }
+
+            this.target.addEventListener('fixit:updateScrollDirection', function (evt) {
+                this.updateScrollDirection(evt.detail.scrollDirection);
+            }.bind(this));
         }
 
         /**
@@ -141,32 +157,42 @@ var FixIt = function () {
     }, {
         key: 'updateStickyStatus',
         value: function updateStickyStatus(isAutoUpdate) {
-            // let targetRect = this.target.getBoundingClientRect();
-
             //isAutoUpdate could be passed as an event instead, so make sure it's an intentional boolean.
             isAutoUpdate = typeof isAutoUpdate === 'boolean' ? isAutoUpdate : false;
 
             //Indicates if the FixIt element has changed positions and prevents making unnecessary recalculations.
             //Useful for when something changes on the page (like toggling content) that would push the FixIt element off (typically when it's resting and `this.isFrozen` is true).
             if (!isAutoUpdate || isAutoUpdate && this._previousDocumentHeight !== this.getDocumentHeight()) {
-                var placeholderRect = this.placeholder.getBoundingClientRect(),
-                    canContainInParent = !this.parentContainer || this.getTargetHeight() < this.parentContainer.getBoundingClientRect().height;
+                var targetHeight = this.getTargetHeight(),
+                    canContainInParent = !this.parentContainer || targetHeight < this.parentContainer.getBoundingClientRect().height;
+
+                this._placeholderRect = this.placeholder.getBoundingClientRect();
 
                 //canContainInParent if target is smaller than its parent
                 //Make sure the entirety of the target element is visible on screen before applying the fixed status.
-                if (placeholderRect.top < this.offset && canContainInParent) {
-                    // this._previousTopPos = targetRect.top;
+                if (canContainInParent && this._placeholderRect.top < this.offset) {
+                    var scrollDirection = this.getScrollDirection();
+
                     this._previousDocumentHeight = this.getDocumentHeight();
+
+                    if (this._placeholderRect.top + targetHeight < this.offset) {
+                        this.setFullyScrolled();
+                    }
+
+                    //Only request to change the direction if this flag is turn on.
+                    //This prevents potentially taxing calculations.
+                    if (this.options.enableDirectionUpdates) {
+                        this.requestScrollDirectionUpdate(scrollDirection);
+                    }
 
                     if (!this.targetIsTall()) {
                         if (!this.isActive) {
                             this.setActive();
                         }
                     } else {
-                        var scrollDir = this.getScrollDirection(),
-                            targetRect = this.target.getBoundingClientRect();
+                        var targetRect = this.target.getBoundingClientRect();
 
-                        if (scrollDir === 'down') {
+                        if (scrollDirection === 'down') {
                             if (Math.round(targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
                                 if (!this.isActive) {
                                     this.isFrozen = false;
@@ -193,7 +219,6 @@ var FixIt = function () {
 
                     this.containInParent();
                 } else if (this.isActive) {
-                    this.isActive = false;
                     this.setInactive();
                 }
             }
@@ -329,11 +354,19 @@ var FixIt = function () {
     }, {
         key: 'setInactive',
         value: function setInactive() {
+            this.isActive = false;
+
             this.setPlaceholderProps();
             this.target.classList.remove('fixit--active');
             this.target.classList.remove('fixit--bottom');
             this.target.classList.remove('fixit--docked');
             this.target.classList.remove('fixit--frozen');
+
+            this.target.classList.remove('fixit--scrolled');
+
+            this.removeDirectionUpdates();
+
+            this.scrollPosition = 0;
 
             if (this.options.useOffsetOnTarget) {
                 this.setTargetPos(true);
@@ -347,6 +380,19 @@ var FixIt = function () {
 
             if (typeof this.options.onInactiveCallback === 'function') {
                 this.options.onInactiveCallback(this.target, this);
+            }
+        }
+    }, {
+        key: 'removeDirectionUpdates',
+        value: function removeDirectionUpdates() {
+            if (this.options.enableDirectionUpdates) {
+                this.target.classList.remove('fixit--scroll-up');
+                this.target.classList.remove('fixit--scroll-down');
+                this.target.classList.remove('fixit--scroll-direction-change');
+
+                delete this._prevScrollDirection;
+
+                window.clearTimeout(this._scrollDirectionTimeout);
             }
         }
 
@@ -413,17 +459,100 @@ var FixIt = function () {
         key: 'getScrollDirection',
         value: function getScrollDirection() {
             var direction = void 0,
-                docScrollTop = this.placeholder.getBoundingClientRect().top;
+                docScrollTop = this._placeholderRect.top;
 
+            //Do not set a direction if there is no difference between these two values.
             if (this.scrollPosition > docScrollTop) {
                 direction = 'down';
-            } else {
+            } else if (this.scrollPosition < docScrollTop) {
                 direction = 'up';
             }
 
             this.scrollPosition = docScrollTop;
 
             return direction;
+        }
+
+        /**
+         * Attempts to update the scroll direction, but only if all the configured options are met.
+         * @param  {String} newScrollDirection ["up" or "down"]
+         */
+
+    }, {
+        key: 'requestScrollDirectionUpdate',
+        value: function requestScrollDirectionUpdate(newScrollDirection) {
+            this._setScrollDirectionCallCount = (this._setScrollDirectionCallCount || 0) + 1;
+            this._newScrollPosition = this._placeholderRect.top;
+
+            //Throttle how often the scroll direction change should be called.
+            //This allows updating the direction even before the user has stopped scrolling.
+            if (this._setScrollDirectionCallCount >= this._scrollDirectionThrottle) {
+                this._updateScrollDirectionOnThreshold(newScrollDirection);
+
+                //Reset the call count once it has reached the minimum threshold.
+                this._setScrollDirectionCallCount = 0;
+            }
+
+            window.clearTimeout(this._scrollDirectionTimeout);
+
+            //Set a timeout to ensure that the last position is stored after the user stops scrolling.
+            this._scrollDirectionTimeout = window.setTimeout(function () {
+                this._updateScrollDirectionOnThreshold(newScrollDirection);
+
+                this._prevScrollPosition = this._placeholderRect.top;
+            }.bind(this), this._scrollDirectionWait);
+        }
+
+        /**
+         * Internal function to ensure the scroll position difference between the last two locations is larger than the configured threshold.
+         * @param  {String} newScrollDirection ["up" or "down"]
+         */
+
+    }, {
+        key: '_updateScrollDirectionOnThreshold',
+        value: function _updateScrollDirectionOnThreshold(newScrollDirection) {
+            //Scroll position difference between the new location and the
+            //location the FixIt target had the last time a "direction change" was succesfully executed.
+            this._diffScrollPosition = Math.abs(this._newScrollPosition - (this._prevScrollPosition || 0));
+
+            if (this._diffScrollPosition > this._scrollPositionThereshold) {
+                this.updateScrollDirection(newScrollDirection);
+            }
+        }
+
+        /**
+         * Update the FixIt target state with the provided `newScrollDirection` value.
+         * @param  {String} newScrollDirection ["up" or "down"]
+         */
+
+    }, {
+        key: 'updateScrollDirection',
+        value: function updateScrollDirection(newScrollDirection) {
+            if (this._prevScrollDirection !== newScrollDirection) {
+                this.target.classList.add('fixit--scroll-' + newScrollDirection);
+                this.target.classList.remove('fixit--scroll-' + this._prevScrollDirection);
+
+                //Attach a special class when the direction has changed at least once.
+                //We know this happens whenever a `this._prevScrollDirection` is available.
+                if (this._prevScrollDirection) {
+                    this.target.classList.add('fixit--scroll-direction-change');
+                }
+
+                this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
+                    previousDirection: this._prevScrollDirection,
+                    newDirection: newScrollDirection
+                });
+
+                this._prevScrollDirection = newScrollDirection;
+                this._prevScrollPosition = this._placeholderRect.top;
+            }
+        }
+    }, {
+        key: 'setFullyScrolled',
+        value: function setFullyScrolled() {
+            if (!this.target.classList.contains('fixit--scrolled')) {
+                this.target.classList.add('fixit--scrolled');
+            }
         }
 
         /**
@@ -439,9 +568,9 @@ var FixIt = function () {
 
     }, {
         key: 'publishEvent',
-        value: function publishEvent(moduleName, eventName, target) {
+        value: function publishEvent(moduleName, eventName, target, detail) {
             var event = void 0,
-                params = { bubbles: true, cancelable: true },
+                params = { bubbles: true, cancelable: true, detail: detail },
                 eventString = moduleName && eventName ? moduleName + ':' + eventName : moduleName || eventName;
 
             // IE >= 9, CustomEvent() constructor does not exist
