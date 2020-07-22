@@ -1,4 +1,12 @@
 
+//Common static properties shared across the plugin.
+const PROPERTIES = {
+    direction: {
+        up: 'up',
+        down: 'down'
+    }
+};
+
 export default class FixIt {
     constructor(options = {}) {
         this.options = options;
@@ -24,7 +32,7 @@ export default class FixIt {
 
         //Amount of times the scroll should fire before allowing to change the direction.
         //Setting this and `scrollPositionThereshold` to 0 makes the direction change happen on every scroll.
-        this._scrollDirectionThrottle = this.options.scrollDirectionThrottle || 20;
+        this._scrollDirectionThrottle = this.options.scrollDirectionThrottle || 16;
 
         this._boundUpdateStickyStatus = this.updateStickyStatus.bind(this);
         this._boundEnableSticky = this.enableSticky.bind(this, 150);
@@ -53,9 +61,7 @@ export default class FixIt {
                 window.addEventListener('scroll', this._boundUpdateStickyStatus);
 
                 this._boundUpdateStickyStatus();
-            }
-
-            else if (this.isEnabled && !this.shouldEnable()) {
+            } else if (this.isEnabled && !this.shouldEnable()) {
                 this.isEnabled = false;
 
                 this.setInactive();
@@ -136,53 +142,46 @@ export default class FixIt {
         //Indicates if the FixIt element has changed positions and prevents making unnecessary recalculations.
         //Useful for when something changes on the page (like toggling content) that would push the FixIt element off (typically when it's resting and `this.isFrozen` is true).
         if (!isAutoUpdate || (isAutoUpdate && this._previousDocumentHeight !== this.getDocumentHeight())) {
-            let targetHeight = this.getTargetHeight(),
-                canContainInParent = !this.parentContainer || (targetHeight < this.parentContainer.getBoundingClientRect().height);
+            this.setRectangles();
 
-            this._placeholderRect = this.placeholder.getBoundingClientRect();
-
-            //canContainInParent if target is smaller than its parent
-            //Make sure the entirety of the target element is visible on screen before applying the fixed status.
-            if (canContainInParent && this._placeholderRect.top < this.offset) {
-                let scrollDirection = this.getScrollDirection();
+            //The first portion of the following conditional checks if the target is smaller than its parent.
+            //Then it makes sure that the entirety of the target element is visible on screen before applying the fixed status.
+            if ((!this.parentContainer || (this._targetRect.height < this._parentContainerRect.height)) && this._placeholderRect.top < this.offset) {
+                this.getScrollDirection();
 
                 this._previousDocumentHeight = this.getDocumentHeight();
 
-                if (this._placeholderRect.top + targetHeight < this.offset) {
-                    this.setFullyScrolled();
-                }
+                this.toggletFullyScrolled(this._placeholderRect.top + this._targetRect.height < this.offset);
 
                 //Only request to change the direction if this flag is turn on.
                 //This prevents potentially taxing calculations.
                 if (this.options.enableDirectionUpdates) {
-                    this.requestScrollDirectionUpdate(scrollDirection);
+                    this.requestScrollDirectionUpdate(this.currentScrollDirection);
                 }
 
-                if( !this.targetIsTall() ) {
-                    if(!this.isActive) {
+                if (!this.targetIsTall()) {
+                    if (!this.isActive) {
                         this.setActive();
                     }
                 } else {
-                    let targetRect = this.target.getBoundingClientRect();
-
-                    if ( scrollDirection === 'down' ) {
-                        if (Math.round(targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
-                            if(!this.isActive) {
+                    if (this.currentScrollDirection === PROPERTIES.direction.down) {
+                        if (Math.round(this._targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
+                            if (!this.isActive) {
                                 this.isFrozen = false;
                                 this.setActive(true);
                             }
-                        } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                        } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                             //We don't wanna run this if it's docked
                             this.isActive = false;
                             this.setFrozen();
                         }
                     } else {
-                        if (Math.round(targetRect.top) >= this.offset) {
-                            if(!this.isActive) {
+                        if (Math.round(this._targetRect.top) >= this.offset) {
+                            if (!this.isActive) {
                                 this.isFrozen = false;
                                 this.setActive();
                             }
-                        } else if (this.isActive && !this.isDocked && !this.shouldDock(targetRect)) {
+                        } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                             //We don't wanna run this if it's docked
                             this.isActive = false;
                             this.setFrozen();
@@ -199,6 +198,15 @@ export default class FixIt {
         return this.isActive || this.isFrozen;
     }
 
+    /**
+     * Updates the commonly-used rectangles for this plugin.
+     */
+    setRectangles() {
+        this._targetRect = this.target.getBoundingClientRect();
+        this._placeholderRect = this.placeholder.getBoundingClientRect();
+        this._parentContainerRect = this.parentContainer ? this.parentContainer.getBoundingClientRect() : {};
+    }
+
     getDocumentHeight() {
         return Math.max(document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight);
     }
@@ -208,21 +216,17 @@ export default class FixIt {
      */
     containInParent() {
         if (this.parentContainer && this.isActive) {
-            let targetRect = this.target.getBoundingClientRect();
-
             //Make sure bottom of parent is visible, then ensure the target and the parent's bottom are at the same level, then confirm the window's offset is not over the target
-            if (this.shouldDock(targetRect)) {
+            if (this.shouldDock()) {
                 this.setDocked();
-            } else if(this.isDocked && targetRect.top >= this.offset) {
+            } else if(this.isDocked && this._targetRect.top >= this.offset) {
                 this.setUndocked();
             }
         }
     }
 
-    shouldDock(targetRect) {
-        let parentBottom = this.parentContainer.getBoundingClientRect().bottom;
-
-        return parentBottom <= document.documentElement.clientHeight && targetRect.bottom >= parentBottom && targetRect.top <= this.offset;
+    shouldDock() {
+        return this._parentContainerRect.bottom <= document.documentElement.clientHeight && this._targetRect.bottom >= this._parentContainerRect.bottom && this._targetRect.top <= this.offset;
     }
 
     setDocked() {
@@ -270,7 +274,7 @@ export default class FixIt {
      */
     setFrozen() {
         this.isFrozen = true;
-        this.target.style.top = Math.abs(this.parentContainer.getBoundingClientRect().top - this.target.getBoundingClientRect().top) + 'px';
+        this.target.style.top = Math.abs(this._parentContainerRect.top - this._targetRect.top) + 'px';
         this.target.classList.remove('fixit--bottom');
         this.target.classList.remove('fixit--active');
         this.target.classList.add('fixit--frozen');
@@ -337,8 +341,8 @@ export default class FixIt {
 
     removeDirectionUpdates() {
         if (this.options.enableDirectionUpdates) {
-            this.target.classList.remove('fixit--scroll-up');
-            this.target.classList.remove('fixit--scroll-down');
+            this.target.classList.remove(`fixit--scroll-${PROPERTIES.direction.up}`);
+            this.target.classList.remove(`fixit--scroll-${PROPERTIES.direction.down}`);
             this.target.classList.remove('fixit--scroll-direction-change');
 
             delete this._prevScrollDirection;
@@ -352,13 +356,11 @@ export default class FixIt {
      * the target element and is used to avoid a jump when scrolling down and activating the 'fixed' status
      */
     setPlaceholder() {
-        let target = this.target;
-
         this.placeholder = document.createElement('div');
 
         this.placeholder.className = 'fixit-placeholder';
 
-        target.parentNode.insertBefore(this.placeholder, target);
+        this.target.parentNode.insertBefore(this.placeholder, this.target);
     }
 
     /*
@@ -374,8 +376,8 @@ export default class FixIt {
      */
     setPlaceholderProps(sync) {
         if (this.placeholder) {
-            if(sync) {
-                this.placeholder.style.height = this.getTargetHeight() + 'px';
+            if (sync) {
+                this.placeholder.style.height = this._targetRect.height + 'px';
                 this.placeholder.style.margin = window.getComputedStyle(this.target).margin;
             } else {
                 this.placeholder.style.height = '';
@@ -385,29 +387,22 @@ export default class FixIt {
     }
 
     targetIsTall() {
-        return (this.getTargetHeight() + this.offset) > document.documentElement.clientHeight;
-    }
-
-    getTargetHeight() {
-        return this.target.getBoundingClientRect().height;
+        return (this._targetRect.height + this.offset) > document.documentElement.clientHeight;
     }
 
     //This method needs revision:
     //Position is not properly reported on certain browsers when using window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
     getScrollDirection() {
-        let direction,
-            docScrollTop = this._placeholderRect.top;
-
         //Do not set a direction if there is no difference between these two values.
-        if (this.scrollPosition > docScrollTop) {
-            direction = 'down';
-        } else if (this.scrollPosition < docScrollTop) {
-            direction = 'up';
+        if (this.scrollPosition > this._placeholderRect.top) {
+            this.currentScrollDirection = PROPERTIES.direction.down;
+        } else if (this.scrollPosition < this._placeholderRect.top) {
+            this.currentScrollDirection = PROPERTIES.direction.up;
         }
 
-        this.scrollPosition = docScrollTop;
+        this.scrollPosition = this._placeholderRect.top;
 
-        return direction;
+        return this.currentScrollDirection;
     }
 
     /**
@@ -476,9 +471,11 @@ export default class FixIt {
         }
     }
 
-    setFullyScrolled() {
-        if (!this.target.classList.contains('fixit--scrolled')) {
-            this.target.classList.add('fixit--scrolled')
+    toggletFullyScrolled(setScrolled) {
+        if (setScrolled) {
+            this.target.classList.add('fixit--scrolled');
+        } else {
+            this.target.classList.remove('fixit--scrolled');
         }
     }
 
