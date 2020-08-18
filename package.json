@@ -1,6 +1,6 @@
 {
   "name": "@borngroup/born-fixit",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Sets a class on a target element to make it sticky. Allows to set a bounds element to constrain the sticky element's scrolling.",
   "main": "dist/born-fixit.min.js",
   "scripts": {
