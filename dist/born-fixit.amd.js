@@ -35,7 +35,8 @@ define(['exports'], function (exports) {
             up: 'up',
             down: 'down'
         }
-    };
+    },
+        INSTANCES = new Map();
 
     var FixIt = function () {
         function FixIt() {
@@ -50,11 +51,12 @@ define(['exports'], function (exports) {
             };
             // this.offset = isNaN(this.options.offset) ?  || 0;
             this.target = (typeof this.options.target === 'string' ? document.querySelector(this.options.target) : this.options.target) || false;
-            this.offsetElements = false;
+            // this.offsetElements = false;
 
             if (this.options.offset && isNaN(this.options.offset)) {
-                this.offsetElements = typeof this.options.offset === 'string' ? document.querySelectorAll(this.options.offset) : this.options.offset;
-                this.offset = this.getOffsetValue();
+                this.setOffsetElements();
+
+                this.setOffsetValue();
             } else {
                 this.offset = this.options.offset || 0;
             }
@@ -78,6 +80,8 @@ define(['exports'], function (exports) {
 
                 window.addEventListener('resize', this._boundEnableSticky);
             }
+
+            INSTANCES.set(this.target, this);
         }
 
         _createClass(FixIt, [{
@@ -86,7 +90,7 @@ define(['exports'], function (exports) {
                 window.clearTimeout(this._resizeTimeout);
 
                 this._resizeTimeout = window.setTimeout(function () {
-                    this.offset = this.getOffsetValue();
+                    this.setOffsetValue();
 
                     if (!this.isEnabled && this.shouldEnable()) {
                         this.isEnabled = true;
@@ -123,8 +127,8 @@ define(['exports'], function (exports) {
                 window.removeEventListener('scroll', this._boundUpdateStickyStatus);
             }
         }, {
-            key: 'getOffsetValue',
-            value: function getOffsetValue() {
+            key: 'setOffsetValue',
+            value: function setOffsetValue() {
                 var resultSum = 0;
 
                 if (this.offsetElements instanceof NodeList) {
@@ -135,7 +139,14 @@ define(['exports'], function (exports) {
                     resultSum = this.offset || 0;
                 }
 
-                return resultSum;
+                return this.offset = resultSum;
+            }
+        }, {
+            key: 'setOffsetElements',
+            value: function setOffsetElements(offset) {
+                offset = offset || this.options.offset;
+
+                return this.offsetElements = typeof offset === 'string' ? document.querySelectorAll(offset) : offset;
             }
         }, {
             key: 'initialSetup',
@@ -154,7 +165,9 @@ define(['exports'], function (exports) {
 
                 this.scrollPosition = 0;
 
-                this.publishEvent('fixit', 'init', this.target);
+                this.publishEvent('fixit', 'init', this.target, {
+                    FixIt: this
+                });
 
                 if (typeof this.options.onInitCallback === 'function') {
                     this.options.onInitCallback(this.target, this);
@@ -321,7 +334,9 @@ define(['exports'], function (exports) {
                     this.respondTo();
                 }
 
-                this.publishEvent('fixit', 'active', this.target);
+                this.publishEvent('fixit', 'active', this.target, {
+                    FixIt: this
+                });
 
                 if (typeof this.options.onActiveCallback === 'function') {
                     this.options.onActiveCallback(this.target, this);
@@ -352,7 +367,9 @@ define(['exports'], function (exports) {
                     this.target.style.width = '';
                 }
 
-                this.publishEvent('fixit', 'inactive', this.target);
+                this.publishEvent('fixit', 'inactive', this.target, {
+                    FixIt: this
+                });
 
                 if (typeof this.options.onInactiveCallback === 'function') {
                     this.options.onInactiveCallback(this.target, this);
@@ -467,7 +484,8 @@ define(['exports'], function (exports) {
 
                     this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
                         previousDirection: this._prevScrollDirection,
-                        newDirection: newScrollDirection
+                        newDirection: newScrollDirection,
+                        FixIt: this
                     });
 
                     this._prevScrollDirection = newScrollDirection;
@@ -499,6 +517,11 @@ define(['exports'], function (exports) {
                 }
 
                 target.dispatchEvent(event);
+            }
+        }], [{
+            key: 'getInstance',
+            value: function getInstance(el) {
+                return INSTANCES.get(el);
             }
         }]);
 

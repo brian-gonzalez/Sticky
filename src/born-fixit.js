@@ -1,11 +1,13 @@
 
 //Common static properties shared across the plugin.
-const PROPERTIES = {
-    direction: {
-        up: 'up',
-        down: 'down'
-    }
-};
+const
+    PROPERTIES = {
+        direction: {
+            up: 'up',
+            down: 'down'
+        }
+    },
+    INSTANCES = new Map();
 
 export default class FixIt {
     constructor(options = {}) {
@@ -14,11 +16,12 @@ export default class FixIt {
         this.shouldEnable = this.options.enabled || function() {return true;};
         // this.offset = isNaN(this.options.offset) ?  || 0;
         this.target = (typeof this.options.target === 'string' ? document.querySelector(this.options.target) : this.options.target) || false;
-        this.offsetElements = false;
+        // this.offsetElements = false;
 
         if (this.options.offset && isNaN(this.options.offset)) {
-            this.offsetElements = typeof this.options.offset === 'string' ? document.querySelectorAll(this.options.offset) : this.options.offset;
-            this.offset = this.getOffsetValue();
+            this.setOffsetElements();
+
+            this.setOffsetValue();
         } else {
             this.offset = this.options.offset || 0;
         }
@@ -42,13 +45,19 @@ export default class FixIt {
 
             window.addEventListener('resize', this._boundEnableSticky);
         }
+
+        INSTANCES.set(this.target, this);
+    }
+
+    static getInstance(el) {
+        return INSTANCES.get(el);
     }
 
     enableSticky(timeOut) {
         window.clearTimeout(this._resizeTimeout);
 
         this._resizeTimeout = window.setTimeout(function() {
-            this.offset = this.getOffsetValue();
+            this.setOffsetValue();
 
             if (!this.isEnabled && this.shouldEnable()) {
                 this.isEnabled = true;
@@ -91,7 +100,7 @@ export default class FixIt {
      * Attempts to get the reference offset element's height, otherwise returns the current offset value or zero.
      * @return {[type]} [description]
      */
-    getOffsetValue() {
+    setOffsetValue() {
         let resultSum = 0;
 
         if (this.offsetElements instanceof NodeList) {
@@ -102,7 +111,13 @@ export default class FixIt {
             resultSum = this.offset || 0;
         }
 
-        return resultSum;
+        return this.offset = resultSum;
+    }
+
+    setOffsetElements(offset) {
+        offset = offset || this.options.offset;
+
+        return this.offsetElements = typeof offset === 'string' ? document.querySelectorAll(offset) : offset;
     }
 
     //Initial FixIt setup. Should only run once to avoid attaching repeated event handlers.
@@ -121,7 +136,9 @@ export default class FixIt {
 
         this.scrollPosition = 0;
 
-        this.publishEvent('fixit', 'init', this.target);
+        this.publishEvent('fixit', 'init', this.target, {
+            FixIt: this
+        });
 
         if (typeof this.options.onInitCallback === 'function') {
             this.options.onInitCallback(this.target, this);
@@ -301,7 +318,9 @@ export default class FixIt {
             this.respondTo();
         }
 
-        this.publishEvent('fixit', 'active', this.target);
+        this.publishEvent('fixit', 'active', this.target, {
+            FixIt: this
+        });
 
         if (typeof this.options.onActiveCallback === 'function') {
             this.options.onActiveCallback(this.target, this);
@@ -332,7 +351,9 @@ export default class FixIt {
             this.target.style.width = '';
         }
 
-        this.publishEvent('fixit', 'inactive', this.target);
+        this.publishEvent('fixit', 'inactive', this.target, {
+            FixIt: this
+        });
 
         if (typeof this.options.onInactiveCallback === 'function') {
             this.options.onInactiveCallback(this.target, this);
@@ -463,7 +484,8 @@ export default class FixIt {
 
             this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
                 previousDirection: this._prevScrollDirection,
-                newDirection: newScrollDirection
+                newDirection: newScrollDirection,
+                FixIt: this
             });
 
             this._prevScrollDirection = newScrollDirection;

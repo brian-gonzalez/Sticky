@@ -14,7 +14,8 @@ var PROPERTIES = {
         up: 'up',
         down: 'down'
     }
-};
+},
+    INSTANCES = new Map();
 
 var FixIt = function () {
     function FixIt() {
@@ -29,11 +30,12 @@ var FixIt = function () {
         };
         // this.offset = isNaN(this.options.offset) ?  || 0;
         this.target = (typeof this.options.target === 'string' ? document.querySelector(this.options.target) : this.options.target) || false;
-        this.offsetElements = false;
+        // this.offsetElements = false;
 
         if (this.options.offset && isNaN(this.options.offset)) {
-            this.offsetElements = typeof this.options.offset === 'string' ? document.querySelectorAll(this.options.offset) : this.options.offset;
-            this.offset = this.getOffsetValue();
+            this.setOffsetElements();
+
+            this.setOffsetValue();
         } else {
             this.offset = this.options.offset || 0;
         }
@@ -57,6 +59,8 @@ var FixIt = function () {
 
             window.addEventListener('resize', this._boundEnableSticky);
         }
+
+        INSTANCES.set(this.target, this);
     }
 
     _createClass(FixIt, [{
@@ -65,7 +69,7 @@ var FixIt = function () {
             window.clearTimeout(this._resizeTimeout);
 
             this._resizeTimeout = window.setTimeout(function () {
-                this.offset = this.getOffsetValue();
+                this.setOffsetValue();
 
                 if (!this.isEnabled && this.shouldEnable()) {
                     this.isEnabled = true;
@@ -113,8 +117,8 @@ var FixIt = function () {
          */
 
     }, {
-        key: 'getOffsetValue',
-        value: function getOffsetValue() {
+        key: 'setOffsetValue',
+        value: function setOffsetValue() {
             var resultSum = 0;
 
             if (this.offsetElements instanceof NodeList) {
@@ -125,7 +129,14 @@ var FixIt = function () {
                 resultSum = this.offset || 0;
             }
 
-            return resultSum;
+            return this.offset = resultSum;
+        }
+    }, {
+        key: 'setOffsetElements',
+        value: function setOffsetElements(offset) {
+            offset = offset || this.options.offset;
+
+            return this.offsetElements = typeof offset === 'string' ? document.querySelectorAll(offset) : offset;
         }
 
         //Initial FixIt setup. Should only run once to avoid attaching repeated event handlers.
@@ -147,7 +158,9 @@ var FixIt = function () {
 
             this.scrollPosition = 0;
 
-            this.publishEvent('fixit', 'init', this.target);
+            this.publishEvent('fixit', 'init', this.target, {
+                FixIt: this
+            });
 
             if (typeof this.options.onInitCallback === 'function') {
                 this.options.onInitCallback(this.target, this);
@@ -351,7 +364,9 @@ var FixIt = function () {
                 this.respondTo();
             }
 
-            this.publishEvent('fixit', 'active', this.target);
+            this.publishEvent('fixit', 'active', this.target, {
+                FixIt: this
+            });
 
             if (typeof this.options.onActiveCallback === 'function') {
                 this.options.onActiveCallback(this.target, this);
@@ -385,7 +400,9 @@ var FixIt = function () {
                 this.target.style.width = '';
             }
 
-            this.publishEvent('fixit', 'inactive', this.target);
+            this.publishEvent('fixit', 'inactive', this.target, {
+                FixIt: this
+            });
 
             if (typeof this.options.onInactiveCallback === 'function') {
                 this.options.onInactiveCallback(this.target, this);
@@ -539,7 +556,8 @@ var FixIt = function () {
 
                 this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
                     previousDirection: this._prevScrollDirection,
-                    newDirection: newScrollDirection
+                    newDirection: newScrollDirection,
+                    FixIt: this
                 });
 
                 this._prevScrollDirection = newScrollDirection;
@@ -583,6 +601,11 @@ var FixIt = function () {
             }
 
             target.dispatchEvent(event);
+        }
+    }], [{
+        key: 'getInstance',
+        value: function getInstance(el) {
+            return INSTANCES.get(el);
         }
     }]);
 
