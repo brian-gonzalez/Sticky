@@ -233,6 +233,10 @@ export default class FixIt {
      */
     containInParent() {
         if (this.parentContainer && this.isActive) {
+            //Update the rectangles before deciding wether to dock or not.
+            //This prevents the target from jumping around outside its container.
+            this.setRectangles();
+
             //Make sure bottom of parent is visible, then ensure the target and the parent's bottom are at the same level, then confirm the window's offset is not over the target
             if (this.shouldDock()) {
                 this.setDocked();
