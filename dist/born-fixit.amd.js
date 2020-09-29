@@ -204,10 +204,14 @@ define(['exports'], function (exports) {
                         }
 
                         if (!this.targetIsTall()) {
+                            this.unsetIsTall();
+
                             if (!this.isActive) {
                                 this.setActive();
                             }
                         } else {
+                            this.setIsTall();
+
                             if (this.currentScrollDirection === PROPERTIES.direction.down) {
                                 if (Math.round(this._targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
                                     if (!this.isActive) {
@@ -217,7 +221,9 @@ define(['exports'], function (exports) {
                                 } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                                     //We don't wanna run this if it's docked
                                     this.isActive = false;
+
                                     this.setFrozen();
+                                    this.unsetBottom();
                                 }
                             } else {
                                 if (Math.round(this._targetRect.top) >= this.offset) {
@@ -228,7 +234,9 @@ define(['exports'], function (exports) {
                                 } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                                     //We don't wanna run this if it's docked
                                     this.isActive = false;
+
                                     this.setFrozen();
+                                    this.unsetBottom();
                                 }
                             }
                         }
@@ -272,14 +280,16 @@ define(['exports'], function (exports) {
         }, {
             key: 'shouldDock',
             value: function shouldDock() {
-                return this._parentContainerRect.bottom <= document.documentElement.clientHeight && this._targetRect.bottom >= this._parentContainerRect.bottom && this._targetRect.top <= this.offset;
+                return this._parentContainerRect.bottom <= document.documentElement.clientHeight && this._targetRect.bottom >= this._parentContainerRect.bottom && (this.isBottom || this._targetRect.top <= this.offset);
             }
         }, {
             key: 'setDocked',
             value: function setDocked() {
                 this.isDocked = true;
                 this.target.classList.add('fixit--docked');
-                this.target.classList.remove('fixit--bottom');
+
+                this.unsetBottom();
+
                 this.setTargetPos(true);
             }
         }, {
@@ -314,10 +324,41 @@ define(['exports'], function (exports) {
             key: 'setFrozen',
             value: function setFrozen() {
                 this.isFrozen = true;
+
                 this.target.style.top = Math.abs(this._parentContainerRect.top - this._targetRect.top) + 'px';
-                this.target.classList.remove('fixit--bottom');
+
                 this.target.classList.remove('fixit--active');
                 this.target.classList.add('fixit--frozen');
+            }
+        }, {
+            key: 'setBottom',
+            value: function setBottom() {
+                this.isBottom = true;
+
+                this.setTargetPos(true);
+
+                this.target.classList.add('fixit--bottom');
+            }
+        }, {
+            key: 'unsetBottom',
+            value: function unsetBottom() {
+                this.isBottom = false;
+
+                this.target.classList.remove('fixit--bottom');
+            }
+        }, {
+            key: 'setIsTall',
+            value: function setIsTall() {
+                this.isTall = true;
+
+                this.target.classList.add('fixit--is-tall');
+            }
+        }, {
+            key: 'unsetIsTall',
+            value: function unsetIsTall() {
+                this.isTall = false;
+
+                this.target.classList.remove('fixit--is-tall');
             }
         }, {
             key: 'setActive',
@@ -328,8 +369,7 @@ define(['exports'], function (exports) {
                 this.target.classList.add('fixit--active');
 
                 if (toBottom) {
-                    this.target.classList.add('fixit--bottom');
-                    this.setTargetPos(true);
+                    this.setBottom();
                 } else {
                     this.setTargetPos();
                 }
@@ -351,12 +391,14 @@ define(['exports'], function (exports) {
             value: function setInactive() {
                 this.isActive = false;
 
+                this.unsetBottom();
+                this.unsetIsTall();
+
                 this.setPlaceholderProps();
+
                 this.target.classList.remove('fixit--active');
-                this.target.classList.remove('fixit--bottom');
                 this.target.classList.remove('fixit--docked');
                 this.target.classList.remove('fixit--frozen');
-
                 this.target.classList.remove('fixit--scrolled');
 
                 this.removeDirectionUpdates();
@@ -476,6 +518,12 @@ define(['exports'], function (exports) {
         }, {
             key: 'updateScrollDirection',
             value: function updateScrollDirection(newScrollDirection) {
+                this.publishEvent('fixit', 'scrollDirectionUpdate', this.target, {
+                    previousDirection: this._prevScrollDirection,
+                    newDirection: newScrollDirection,
+                    FixIt: this
+                });
+
                 if (this._prevScrollDirection !== newScrollDirection) {
                     this.target.classList.add('fixit--scroll-' + newScrollDirection);
                     this.target.classList.remove('fixit--scroll-' + this._prevScrollDirection);
@@ -485,12 +533,6 @@ define(['exports'], function (exports) {
                     if (this._prevScrollDirection) {
                         this.target.classList.add('fixit--scroll-direction-change');
                     }
-
-                    this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
-                        previousDirection: this._prevScrollDirection,
-                        newDirection: newScrollDirection,
-                        FixIt: this
-                    });
 
                     this._prevScrollDirection = newScrollDirection;
                     this._prevScrollPosition = this._placeholderRect.top;

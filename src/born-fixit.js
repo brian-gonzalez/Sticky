@@ -177,10 +177,14 @@ export default class FixIt {
                 }
 
                 if (!this.targetIsTall()) {
+                    this.unsetIsTall();
+
                     if (!this.isActive) {
                         this.setActive();
                     }
                 } else {
+                    this.setIsTall();
+
                     if (this.currentScrollDirection === PROPERTIES.direction.down) {
                         if (Math.round(this._targetRect.bottom) <= Math.max(window.innerHeight, document.documentElement.clientHeight)) {
                             if (!this.isActive) {
@@ -190,7 +194,9 @@ export default class FixIt {
                         } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                             //We don't wanna run this if it's docked
                             this.isActive = false;
+
                             this.setFrozen();
+                            this.unsetBottom();
                         }
                     } else {
                         if (Math.round(this._targetRect.top) >= this.offset) {
@@ -201,7 +207,9 @@ export default class FixIt {
                         } else if (this.isActive && !this.isDocked && !this.shouldDock()) {
                             //We don't wanna run this if it's docked
                             this.isActive = false;
+
                             this.setFrozen();
+                            this.unsetBottom();
                         }
                     }
                 }
@@ -247,13 +255,15 @@ export default class FixIt {
     }
 
     shouldDock() {
-        return this._parentContainerRect.bottom <= document.documentElement.clientHeight && this._targetRect.bottom >= this._parentContainerRect.bottom && this._targetRect.top <= this.offset;
+        return this._parentContainerRect.bottom <= document.documentElement.clientHeight && this._targetRect.bottom >= this._parentContainerRect.bottom && (this.isBottom || this._targetRect.top <= this.offset);
     }
 
     setDocked() {
         this.isDocked = true;
         this.target.classList.add('fixit--docked');
-        this.target.classList.remove('fixit--bottom');
+
+        this.unsetBottom();
+
         this.setTargetPos(true);
     }
 
@@ -295,10 +305,37 @@ export default class FixIt {
      */
     setFrozen() {
         this.isFrozen = true;
+
         this.target.style.top = Math.abs(this._parentContainerRect.top - this._targetRect.top) + 'px';
-        this.target.classList.remove('fixit--bottom');
+
         this.target.classList.remove('fixit--active');
         this.target.classList.add('fixit--frozen');
+    }
+
+    setBottom() {
+        this.isBottom = true;
+
+        this.setTargetPos(true);
+
+        this.target.classList.add('fixit--bottom');
+    }
+
+    unsetBottom() {
+        this.isBottom = false;
+
+        this.target.classList.remove('fixit--bottom');
+    }
+
+    setIsTall() {
+        this.isTall = true;
+
+        this.target.classList.add('fixit--is-tall');
+    }
+
+    unsetIsTall() {
+        this.isTall = false;
+
+        this.target.classList.remove('fixit--is-tall');
     }
 
     /**
@@ -312,8 +349,7 @@ export default class FixIt {
         this.target.classList.add('fixit--active');
 
         if (toBottom) {
-            this.target.classList.add('fixit--bottom');
-            this.setTargetPos(true);
+            this.setBottom();
         } else {
             this.setTargetPos();
         }
@@ -335,12 +371,14 @@ export default class FixIt {
     setInactive() {
         this.isActive = false;
 
+        this.unsetBottom();
+        this.unsetIsTall();
+
         this.setPlaceholderProps();
+
         this.target.classList.remove('fixit--active');
-        this.target.classList.remove('fixit--bottom');
         this.target.classList.remove('fixit--docked');
         this.target.classList.remove('fixit--frozen');
-
         this.target.classList.remove('fixit--scrolled');
 
         this.removeDirectionUpdates();
@@ -476,6 +514,12 @@ export default class FixIt {
      * @param  {String} newScrollDirection ["up" or "down"]
      */
     updateScrollDirection(newScrollDirection) {
+        this.publishEvent('fixit', 'scrollDirectionUpdate', this.target, {
+            previousDirection: this._prevScrollDirection,
+            newDirection: newScrollDirection,
+            FixIt: this
+        });
+
         if (this._prevScrollDirection !== newScrollDirection) {
             this.target.classList.add(`fixit--scroll-${newScrollDirection}`);
             this.target.classList.remove(`fixit--scroll-${this._prevScrollDirection}`);
@@ -485,12 +529,6 @@ export default class FixIt {
             if (this._prevScrollDirection) {
                 this.target.classList.add('fixit--scroll-direction-change');
             }
-
-            this.publishEvent('fixit', 'scrollDirectionChange', this.target, {
-                previousDirection: this._prevScrollDirection,
-                newDirection: newScrollDirection,
-                FixIt: this
-            });
 
             this._prevScrollDirection = newScrollDirection;
             this._prevScrollPosition = this._placeholderRect.top;
