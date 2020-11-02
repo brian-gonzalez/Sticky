@@ -146,12 +146,6 @@ var FixIt = function () {
         value: function initialSetup() {
             this.setPlaceholder();
 
-            //Setup the rectangles for initial configurations.
-            this.setRectangles();
-
-            //Initialize the placeholder with its dimensions if using `fromViewportBottom`.
-            this.setPlaceholderProps(this.options.fromViewportBottom);
-
             this.parentContainer = this.options.containedInParent ? this.options.containedInParent instanceof HTMLElement ? this.options.containedInParent : this.target.parentNode : false;
 
             if (this.options.respondToParent) {
@@ -193,7 +187,7 @@ var FixIt = function () {
                 this.setRectangles();
 
                 //Set a property for the directional start location depending on wether or not `fromViewportBottom` is set to TRUE.
-                this._scrollListeningStart = this.options.fromViewportBottom ? this._placeholderRect.bottom - Math.max(window.innerHeight, document.documentElement.clientHeight) : this._placeholderRect.top;
+                this._scrollListeningStart = this.options.fromViewportBottom ? this._placeholderRect.top + this._targetRect.height - Math.max(window.innerHeight, document.documentElement.clientHeight) : this._placeholderRect.top;
 
                 //The first portion of the following conditional checks if the target is smaller than its parent.
                 //Then it makes sure that the entirety of the target element is visible on screen before applying the fixed status.
