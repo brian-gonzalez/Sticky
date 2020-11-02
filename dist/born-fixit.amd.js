@@ -153,6 +153,12 @@ define(['exports'], function (exports) {
             value: function initialSetup() {
                 this.setPlaceholder();
 
+                //Setup the rectangles for initial configurations.
+                this.setRectangles();
+
+                //Initialize the placeholder with its dimensions if using `fromViewportBottom`.
+                this.setPlaceholderProps(this.options.fromViewportBottom);
+
                 this.parentContainer = this.options.containedInParent ? this.options.containedInParent instanceof HTMLElement ? this.options.containedInParent : this.target.parentNode : false;
 
                 if (this.options.respondToParent) {
@@ -188,9 +194,12 @@ define(['exports'], function (exports) {
                 if (!isAutoUpdate || isAutoUpdate && this._previousDocumentHeight !== this.getDocumentHeight()) {
                     this.setRectangles();
 
+                    //Set a property for the directional start location depending on wether or not `fromViewportBottom` is set to TRUE.
+                    this._scrollListeningStart = this.options.fromViewportBottom ? this._placeholderRect.bottom - Math.max(window.innerHeight, document.documentElement.clientHeight) : this._placeholderRect.top;
+
                     //The first portion of the following conditional checks if the target is smaller than its parent.
                     //Then it makes sure that the entirety of the target element is visible on screen before applying the fixed status.
-                    if ((!this.parentContainer || this._targetRect.height < this._parentContainerRect.height) && this._placeholderRect.top < this.offset) {
+                    if ((!this.parentContainer || this._targetRect.height < this._parentContainerRect.height) && this._scrollListeningStart < this.offset) {
                         this.getScrollDirection();
 
                         this._previousDocumentHeight = this.getDocumentHeight();
@@ -364,7 +373,9 @@ define(['exports'], function (exports) {
             key: 'setActive',
             value: function setActive(toBottom) {
                 this.isActive = true;
-                this.setPlaceholderProps(true);
+
+                //If `fromViewportBottom` is set to TRUE, set placeholder's dimensions to 0, otherwise calculate and set its dimensions;
+                this.setPlaceholderProps(!this.options.fromViewportBottom);
                 this.target.classList.remove('fixit--frozen');
                 this.target.classList.add('fixit--active');
 
@@ -394,7 +405,8 @@ define(['exports'], function (exports) {
                 this.unsetBottom();
                 this.unsetIsTall();
 
-                this.setPlaceholderProps();
+                //If `fromViewportBottom` is set to TRUE, calculate and set the placeholder's dimensions, otherwise reset to 0;
+                this.setPlaceholderProps(this.options.fromViewportBottom && this.isEnabled);
 
                 this.target.classList.remove('fixit--active');
                 this.target.classList.remove('fixit--docked');
