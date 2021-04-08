@@ -368,9 +368,9 @@
     }, {
       key: "setActive",
       value: function setActive(toBottom) {
-        this.isActive = true; //If `fromViewportBottom` is set to TRUE, set placeholder's dimensions to 0, otherwise calculate and set its dimensions;
+        this.isActive = true; //If `reversePlaceholderBehavior` is set to TRUE, set placeholder's dimensions to 0, otherwise calculate and set its dimensions;
 
-        this.setPlaceholderProps(!this.options.fromViewportBottom);
+        this.setPlaceholderProps(!this.options.reversePlaceholderBehavior);
         this.target.classList.remove('fixit--frozen');
         this.target.classList.add('fixit--active');
 
@@ -398,9 +398,9 @@
       value: function setInactive() {
         this.isActive = false;
         this.unsetBottom();
-        this.unsetIsTall(); //If `fromViewportBottom` is set to TRUE, calculate and set the placeholder's dimensions, otherwise reset to 0;
+        this.unsetIsTall(); //If `reversePlaceholderBehavior` is set to TRUE, calculate and set the placeholder's dimensions, otherwise reset to 0;
 
-        this.setPlaceholderProps(this.options.fromViewportBottom && this.isEnabled);
+        this.setPlaceholderProps(this.options.reversePlaceholderBehavior && this.isEnabled);
         this.target.classList.remove('fixit--active');
         this.target.classList.remove('fixit--docked');
         this.target.classList.remove('fixit--frozen');
