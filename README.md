@@ -1,4 +1,4 @@
-# BORN FixIt #
+# Sticky #
 
 Sets elements to 'position: fixed;' after window has scrolled to the 'target' element. Allows to set boundaries and other options. 
 
